@@ -11,7 +11,8 @@ from selenium.common.exceptions import ElementClickInterceptedException
 from bs4 import BeautifulSoup, Tag
 import requests
 from tqdm import tqdm
-
+import cProfile
+import pstats
 
 class RequestCounter:
     def __init__(self) -> None:
@@ -207,4 +208,11 @@ def get_all_products() -> None:
 
 
 if __name__ == "__main__":
+    # profiler = cProfile.Profile()
+    # profiler.enable()
     get_all_products()
+    # profiler.disable()
+    # profiler.dump_stats("profile_output.prof")
+
+    # stats = pstats.Stats("profile_output.prof").sort_stats("tottime")
+    # stats.print_stats(10)
