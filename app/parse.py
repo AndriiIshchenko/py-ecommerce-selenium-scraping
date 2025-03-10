@@ -1,3 +1,4 @@
+from collections import defaultdict
 import csv
 from dataclasses import astuple, dataclass, fields
 from typing import Generator
@@ -13,6 +14,31 @@ import requests
 from tqdm import tqdm
 import cProfile
 import pstats
+from line_profiler import LineProfiler
+
+call_counts = defaultdict(int)
+
+def profile_function(func):
+    def wrapper(*args, **kwargs):
+        global call_counts
+        call_counts[func.__name__] += 1  # Increment call count
+
+        profiler = LineProfiler()
+        profiler.add_function(func)
+        profiler.enable()
+        
+        result = func(*args, **kwargs)
+        
+        profiler.disable()
+        
+        # Generate unique filename: function_name{call_number}.txt
+        file_name = f"{func.__name__}_{call_counts[func.__name__]}.txt"
+        with open(file_name, "w") as f:
+            profiler.print_stats(stream=f)
+        
+        print(f"Profiling results saved to {file_name}")
+        return result
+    return wrapper
 
 class RequestCounter:
     def __init__(self) -> None:
@@ -54,7 +80,7 @@ class Product:
 
 PRODUCT_FIELDS = [field.name for field in fields(Product)]
 
-
+@profile_function
 def get_pages_links(
     base_url: str, page_link: str, pages_links: set[str] = None
 ) -> Generator[tuple[str, str], None, None]:
@@ -91,9 +117,10 @@ def get_pages_links(
             yield page_url, page_name
 
 
+@profile_function
 def remove_overlay(driver: webdriver) -> None:
     try:
-        cookie_banner = WebDriverWait(driver, 10).until(
+        cookie_banner = WebDriverWait(driver, timeout=1).until(
             ec.presence_of_element_located((By.ID, "cookieBanner"))
         )
         close_button = cookie_banner.find_element(
@@ -104,7 +131,7 @@ def remove_overlay(driver: webdriver) -> None:
         # print(f"Exception occurred while handling cookie banner: {e}")
         pass
 
-
+@profile_function
 def expand_page(driver: webdriver, page_url: str) -> None:
     absolute_url = urljoin(BASE_URL, page_url)
     driver.get(absolute_url)
@@ -208,11 +235,11 @@ def get_all_products() -> None:
 
 
 if __name__ == "__main__":
-    # profiler = cProfile.Profile()
-    # profiler.enable()
+    profiler = cProfile.Profile()
+    profiler.enable()
     get_all_products()
-    # profiler.disable()
-    # profiler.dump_stats("profile_output.prof")
+    profiler.disable()
+    profiler.dump_stats("profile_output.prof")
 
-    # stats = pstats.Stats("profile_output.prof").sort_stats("tottime")
-    # stats.print_stats(10)
+    stats = pstats.Stats("profile_output.prof").sort_stats("tottime")
+    stats.print_stats(10)
